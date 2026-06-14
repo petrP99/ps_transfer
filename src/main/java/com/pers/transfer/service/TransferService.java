@@ -3,10 +3,8 @@ package com.pers.transfer.service;
 import com.pers.transfer.client.CoreBankingClient;
 import com.pers.transfer.domain.Transfer;
 import com.pers.transfer.domain.TransferStatus;
-import com.pers.transfer.dto.response.CardResponse;
 import com.pers.transfer.dto.request.CardOperationContextRequest;
 import com.pers.transfer.dto.response.CardOperationContextResponse;
-import com.pers.transfer.dto.response.ClientResponse;
 import com.pers.transfer.dto.response.PageResponse;
 import com.pers.transfer.dto.request.PhoneTransferPreviewRequest;
 import com.pers.transfer.dto.request.PhoneTransferRequest;
@@ -50,10 +48,6 @@ public class TransferService {
     private final TransferMapper transferMapper;
     private final TransferCalculationService calculationService;
 
-    public List<CardResponse> getCards() {
-        return coreClient.getCards();
-    }
-
     public TransferPreviewResponse preview(TransferPreviewRequest request) {
         return prepare(request).preview();
     }
@@ -83,11 +77,9 @@ public class TransferService {
     }
 
     private TransferResponse create(TransferPreparationResponse preparation) {
-        ClientResponse sender = coreClient.getProfile();
         Transfer transfer = transferRepository.save(
                 transferMapper.toEntity(
                         preparation,
-                        sender,
                         preparation.preview().recipientPhone()
                 )
         );
@@ -145,6 +137,7 @@ public class TransferService {
         return new TransferPreparationResponse(
                 context.fromClientId(),
                 context.toClientId(),
+                context.sender(),
                 preview
         );
     }

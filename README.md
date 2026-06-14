@@ -51,7 +51,7 @@ CORE_INTERNAL_TOKEN=<secret>       # ps-transfer
 TRANSFER_INTERNAL_TOKEN=<secret>   # основной backend
 ```
 
-Оно защищает технический `/api/v1/banking-operation-support/**` от прямого
+Оно защищает технический `/api/v1/internal/transfers/**` от прямого
 вызова через BFF.
 
 Liquibase создает актуальную схему и загружает начальную историю из

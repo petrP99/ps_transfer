@@ -14,6 +14,7 @@ public record CardOperationContextResponse(UUID fromClientId,
                                            Currency targetCurrency,
                                            BigDecimal sourceRate,
                                            BigDecimal targetRate,
+                                           String sender,
                                            String recipient
 ) {
 }

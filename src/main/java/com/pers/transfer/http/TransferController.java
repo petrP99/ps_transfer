@@ -1,6 +1,5 @@
 package com.pers.transfer.http;
 
-import com.pers.transfer.dto.response.CardResponse;
 import com.pers.transfer.dto.response.PageResponse;
 import com.pers.transfer.dto.request.PhoneTransferPreviewRequest;
 import com.pers.transfer.dto.request.PhoneTransferRequest;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -30,11 +28,6 @@ import java.util.UUID;
 public class TransferController {
 
     private final TransferService transferService;
-
-    @GetMapping("/cards")
-    ResponseEntity<List<CardResponse>> getCards() {
-        return ResponseEntity.ok(transferService.getCards());
-    }
 
     @PostMapping("/preview")
     ResponseEntity<TransferPreviewResponse> preview(@Valid @RequestBody TransferPreviewRequest request) {

@@ -1,8 +1,8 @@
 package com.pers.transfer.mapper;
 
 import com.pers.transfer.domain.AccountTransfer;
-import com.pers.transfer.dto.response.AccountOperationContextResponse;
 import com.pers.transfer.dto.request.AccountTransferRequest;
+import com.pers.transfer.dto.response.AccountOperationContextResponse;
 import com.pers.transfer.dto.response.AccountTransferResponse;
 import com.pers.transfer.service.TransferCalculationService.Calculation;
 import org.springframework.stereotype.Component;
@@ -13,11 +13,9 @@ import java.util.UUID;
 @Component
 public class AccountTransferMapper {
 
-    public AccountTransferResponse toPreviewResponse(
-            AccountTransferRequest request,
-            AccountOperationContextResponse context,
-            Calculation calculation
-    ) {
+    public AccountTransferResponse toPreviewResponse(AccountTransferRequest request,
+                                                     AccountOperationContextResponse context,
+                                                     Calculation calculation) {
         return new AccountTransferResponse(
                 null,
                 request.accountFrom(),
@@ -33,10 +31,7 @@ public class AccountTransferMapper {
         );
     }
 
-    public AccountTransfer toEntity(
-            AccountTransferResponse response,
-            UUID clientId
-    ) {
+    public AccountTransfer toEntity(AccountTransferResponse response, UUID clientId) {
         return AccountTransfer.builder()
                 .clientId(clientId)
                 .accountFrom(response.accountFrom())

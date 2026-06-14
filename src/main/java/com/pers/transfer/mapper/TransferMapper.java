@@ -4,7 +4,6 @@ import com.pers.transfer.domain.AccountTransfer;
 import com.pers.transfer.domain.Transfer;
 import com.pers.transfer.domain.TransferStatus;
 import com.pers.transfer.dto.response.CardOperationContextResponse;
-import com.pers.transfer.dto.response.ClientResponse;
 import com.pers.transfer.dto.response.TransferHistoryResponse;
 import com.pers.transfer.dto.response.TransferPreparationResponse;
 import com.pers.transfer.dto.response.TransferPreviewResponse;
@@ -21,7 +20,7 @@ public class TransferMapper {
 
     public TransferPreviewResponse toPreviewResponse(
             CardOperationContextResponse context,
-            BigDecimal amount,
+            BigDecimal amount, //todo для чего передается
             String recipientPhone,
             String message,
             Calculation calculation
@@ -45,7 +44,6 @@ public class TransferMapper {
 
     public Transfer toEntity(
             TransferPreparationResponse preparation,
-            ClientResponse sender,
             String recipientPhone
     ) {
         TransferPreviewResponse preview = preparation.preview();
@@ -63,7 +61,7 @@ public class TransferMapper {
                 .targetCurrency(preview.targetCurrency())
                 .status(TransferStatus.IN_PROGRESS)
                 .timeOfTransfer(LocalDateTime.now())
-                .sender(sender.fullName())
+                .sender(preparation.sender())
                 .recipient(preview.recipient())
                 .recipientPhone(recipientPhone)
                 .message(preview.message())
