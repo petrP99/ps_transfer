@@ -1,0 +1,20 @@
+services:
+  transfer-postgres:
+    image: postgres:16
+    container_name: ps-transfer-postgres
+    environment:
+      POSTGRES_DB: ps_transfer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - transfer-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ps_transfer"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  transfer-postgres-data:

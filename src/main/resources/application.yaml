@@ -1,0 +1,68 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: ps-transfer
+  datasource:
+    url: ${TRANSFER_DB_URL:jdbc:postgresql://localhost:5434/ps_transfer}
+    username: ${TRANSFER_DB_USERNAME:postgres}
+    password: ${TRANSFER_DB_PASSWORD:postgres}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        hbm2ddl.auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/psproject}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/psproject/protocol/openid-connect/certs}
+  cloud:
+    openfeign:
+      client:
+        config:
+          core-service:
+            connect-timeout: 1500
+            read-timeout: 3000
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    topics:
+      transfer-execute: ps-transfer-execute
+      transfer-result: ps-transfer-result
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.type.mapping: balanceOperationCommand:com.pers.transfer.event.BalanceOperationCommand,balanceOperationResult:com.pers.transfer.event.BalanceOperationResult
+    consumer:
+      group-id: ps-transfer-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.type.mapping: balanceOperationCommand:com.pers.transfer.event.BalanceOperationCommand,balanceOperationResult:com.pers.transfer.event.BalanceOperationResult
+        spring.json.trusted.packages: "com.pers.*"
+
+services:
+  core:
+    url: ${CORE_SERVICE_URL:http://localhost:8080}
+    internal-token: ${CORE_INTERNAL_TOKEN:dev-transfer-internal-token}
+
+transfer:
+  commission-percent: ${TRANSFER_COMMISSION_PERCENT:0.5}
+
+outbox:
+  publisher:
+    fixed-delay-ms: 1000
+    initial-delay-ms: 1000
+    batch-size: 50
+    retry-delay-seconds: 10
+    max-attempts: 20
+    max-retry-delay-seconds: 3600
+    retention-days: 7
+    cleanup-cron: "0 0 3 * * *"
