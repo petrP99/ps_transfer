@@ -8,6 +8,7 @@ import com.pers.transfer.dto.response.TransferHistoryResponse;
 import com.pers.transfer.dto.response.TransferPreparationResponse;
 import com.pers.transfer.dto.response.TransferPreviewResponse;
 import com.pers.transfer.dto.response.TransferResponse;
+import com.pers.transfer.event.BalanceOperationCommand;
 import com.pers.transfer.service.TransferCalculationService.Calculation;
 import org.springframework.stereotype.Component;
 
@@ -18,13 +19,14 @@ import java.util.UUID;
 @Component
 public class TransferMapper {
 
-    public TransferPreviewResponse toPreviewResponse(
-            CardOperationContextResponse context,
-            BigDecimal amount, //todo для чего передается
-            String recipientPhone,
-            String message,
-            Calculation calculation
-    ) {
+    public static final String BETWEEN_OWN_ACCOUNTS = "Между своими счетами";
+    public static final String ACCOUNT = "ACCOUNT";
+    public static final String CARD = "CARD";
+
+    public TransferPreviewResponse toPreviewResponse(CardOperationContextResponse context,
+                                                     String recipientPhone,
+                                                     String message,
+                                                     Calculation calculation) {
         return new TransferPreviewResponse(
                 context.cardFrom(),
                 context.cardTo(),
@@ -42,10 +44,7 @@ public class TransferMapper {
         );
     }
 
-    public Transfer toEntity(
-            TransferPreparationResponse preparation,
-            String recipientPhone
-    ) {
+    public Transfer toEntity(TransferPreparationResponse preparation, String recipientPhone) {
         TransferPreviewResponse preview = preparation.preview();
         return Transfer.builder()
                 .fromClientId(preparation.fromClientId())
@@ -110,7 +109,7 @@ public class TransferMapper {
                 transfer.getDebitAmount(),
                 transfer.getCurrency(),
                 transfer.getTargetCurrency(),
-                "CARD",
+                CARD,
                 null,
                 null,
                 null,
@@ -122,7 +121,7 @@ public class TransferMapper {
         return new TransferHistoryResponse(
                 transfer.getId(),
                 false,
-                "Между своими счетами",
+                BETWEEN_OWN_ACCOUNTS,
                 null,
                 null,
                 transfer.getAmount(),
@@ -136,11 +135,26 @@ public class TransferMapper {
                 transfer.getAmount(),
                 transfer.getCurrency(),
                 transfer.getTargetCurrency(),
-                "ACCOUNT",
+                ACCOUNT,
                 transfer.getAccountFrom(),
                 transfer.getAccountFromName(),
                 transfer.getAccountTo(),
                 transfer.getAccountToName()
         );
     }
+
+    public BalanceOperationCommand toBalanceOperationCommand(Transfer transfer) {
+        return new BalanceOperationCommand(
+                transfer.getId(),
+                transfer.getFromClientId(),
+                transfer.getToClientId(),
+                transfer.getCardFrom(),
+                transfer.getCardTo(),
+                transfer.getDebitAmount(),
+                transfer.getAmountTo(),
+                transfer.getCurrency(),
+                transfer.getTargetCurrency()
+        );
+    }
+
 }

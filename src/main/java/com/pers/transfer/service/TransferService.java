@@ -4,16 +4,16 @@ import com.pers.transfer.client.CoreBankingClient;
 import com.pers.transfer.domain.Transfer;
 import com.pers.transfer.domain.TransferStatus;
 import com.pers.transfer.dto.request.CardOperationContextRequest;
-import com.pers.transfer.dto.response.CardOperationContextResponse;
-import com.pers.transfer.dto.response.PageResponse;
+import com.pers.transfer.dto.request.PhoneOperationContextRequest;
 import com.pers.transfer.dto.request.PhoneTransferPreviewRequest;
 import com.pers.transfer.dto.request.PhoneTransferRequest;
-import com.pers.transfer.dto.request.PhoneOperationContextRequest;
+import com.pers.transfer.dto.request.TransferPreviewRequest;
+import com.pers.transfer.dto.request.TransferRequest;
+import com.pers.transfer.dto.response.CardOperationContextResponse;
+import com.pers.transfer.dto.response.PageResponse;
 import com.pers.transfer.dto.response.TransferHistoryResponse;
 import com.pers.transfer.dto.response.TransferPreparationResponse;
-import com.pers.transfer.dto.request.TransferPreviewRequest;
 import com.pers.transfer.dto.response.TransferPreviewResponse;
-import com.pers.transfer.dto.request.TransferRequest;
 import com.pers.transfer.dto.response.TransferResponse;
 import com.pers.transfer.event.BalanceOperationCommand;
 import com.pers.transfer.event.BalanceOperationResult;
@@ -29,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -77,24 +78,10 @@ public class TransferService {
     }
 
     private TransferResponse create(TransferPreparationResponse preparation) {
-        Transfer transfer = transferRepository.save(
-                transferMapper.toEntity(
-                        preparation,
-                        preparation.preview().recipientPhone()
-                )
-        );
+        Transfer transfer = transferRepository.save(transferMapper.toEntity(preparation, preparation.preview().recipientPhone()));
+        BalanceOperationCommand balanceOperationCommand = transferMapper.toBalanceOperationCommand(transfer);
+        outboxService.saveExecutionRequested(balanceOperationCommand);
 
-        outboxService.saveExecutionRequested(new BalanceOperationCommand(
-                transfer.getId(),
-                transfer.getFromClientId(),
-                transfer.getToClientId(),
-                transfer.getCardFrom(),
-                transfer.getCardTo(),
-                transfer.getDebitAmount(),
-                transfer.getAmountTo(),
-                transfer.getCurrency(),
-                transfer.getTargetCurrency()
-        ));
         return transferMapper.toResponse(transfer);
     }
 
@@ -112,12 +99,10 @@ public class TransferService {
         return prepare(context, request.amount(), request.phone(), request.message());
     }
 
-    private TransferPreparationResponse prepare(
-            CardOperationContextResponse context,
-            java.math.BigDecimal amount,
-            String recipientPhone,
-            String message
-    ) {
+    private TransferPreparationResponse prepare(CardOperationContextResponse context,
+                                                BigDecimal amount,
+                                                String recipientPhone,
+                                                String message) {
         TransferCalculationService.Calculation calculation = calculationService.calculate(
                 amount,
                 context.currency(),
@@ -129,23 +114,15 @@ public class TransferService {
         validateFunds(context.sourceBalance(), calculation.debitAmount());
         TransferPreviewResponse preview = transferMapper.toPreviewResponse(
                 context,
-                amount,
                 recipientPhone,
                 message,
                 calculation
         );
-        return new TransferPreparationResponse(
-                context.fromClientId(),
-                context.toClientId(),
-                context.sender(),
-                preview
-        );
+
+        return new TransferPreparationResponse(context.fromClientId(), context.toClientId(), context.sender(), preview);
     }
 
-    private void validateFunds(
-            java.math.BigDecimal balance,
-            java.math.BigDecimal debitAmount
-    ) {
+    private void validateFunds(BigDecimal balance, BigDecimal debitAmount) {
         if (balance.compareTo(debitAmount) < 0) {
             throw new TransferException(CONFLICT, ErrorCode.ACCOUNT_INSUFFICIENT_FUNDS);
         }

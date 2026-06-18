@@ -37,7 +37,7 @@ mvn spring-boot:run
 - API: `8082`;
 - PostgreSQL: `5434`;
 - основной backend: `8080`;
-- BFF: `9090`;
+- BFF: `9091`;
 - Kafka: `9092`;
 - Keycloak: `8081`.
 

@@ -4,8 +4,8 @@ import com.pers.transfer.client.CoreBankingClient;
 import com.pers.transfer.domain.AccountTransfer;
 import com.pers.transfer.dto.request.AccountBalanceOperationRequest;
 import com.pers.transfer.dto.request.AccountOperationContextRequest;
-import com.pers.transfer.dto.response.AccountOperationContextResponse;
 import com.pers.transfer.dto.request.AccountTransferRequest;
+import com.pers.transfer.dto.response.AccountOperationContextResponse;
 import com.pers.transfer.dto.response.AccountTransferResponse;
 import com.pers.transfer.exception.ErrorCode;
 import com.pers.transfer.exception.TransferException;
@@ -14,6 +14,8 @@ import com.pers.transfer.repository.AccountTransferRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 
@@ -50,16 +52,16 @@ public class AccountTransferService {
 
     private PreparedAccountTransfer prepare(AccountTransferRequest request) {
         AccountOperationContextResponse context = coreClient.getAccountContext(
-                new AccountOperationContextRequest(request.accountFrom(), request.accountTo())
-        );
+                new AccountOperationContextRequest(request.accountFrom(), request.accountTo()));
+
         TransferCalculationService.Calculation calculation = calculationService.calculate(
                 request.amount(),
                 context.currency(),
                 context.targetCurrency(),
                 context.sourceRate(),
                 context.targetRate(),
-                false
-        );
+                false);
+        
         if (context.sourceBalance().compareTo(calculation.debitAmount()) < 0) {
             throw new TransferException(CONFLICT, ErrorCode.ACCOUNT_INSUFFICIENT_FUNDS);
         }
@@ -69,9 +71,6 @@ public class AccountTransferService {
         );
     }
 
-    private record PreparedAccountTransfer(
-            java.util.UUID clientId,
-            AccountTransferResponse response
-    ) {
+    private record PreparedAccountTransfer(UUID clientId, AccountTransferResponse response) {
     }
 }
