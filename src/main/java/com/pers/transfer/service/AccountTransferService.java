@@ -7,11 +7,13 @@ import com.pers.transfer.dto.request.AccountOperationContextRequest;
 import com.pers.transfer.dto.request.AccountTransferRequest;
 import com.pers.transfer.dto.response.AccountOperationContextResponse;
 import com.pers.transfer.dto.response.AccountTransferResponse;
+import com.pers.transfer.exception.BusinessException;
 import com.pers.transfer.exception.ErrorCode;
 import com.pers.transfer.exception.TransferException;
 import com.pers.transfer.mapper.AccountTransferMapper;
 import com.pers.transfer.repository.AccountTransferRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ import java.util.UUID;
 import static org.springframework.http.HttpStatus.CONFLICT;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AccountTransferService {
 
@@ -34,20 +37,37 @@ public class AccountTransferService {
 
     @Transactional
     public AccountTransferResponse transfer(AccountTransferRequest request) {
-        PreparedAccountTransfer prepared = prepare(request);
-        AccountTransferResponse response = prepared.response();
-        coreClient.executeAccountOperation(new AccountBalanceOperationRequest(
-                response.accountFrom(),
-                response.accountTo(),
-                response.amount(),
-                response.amountTo(),
-                response.currency(),
-                response.targetCurrency()
-        ));
-        AccountTransfer transfer = repository.save(
-                accountTransferMapper.toEntity(response, prepared.clientId())
-        );
-        return accountTransferMapper.toResponse(transfer);
+        try {
+            PreparedAccountTransfer prepared = prepare(request);
+            AccountTransferResponse response = prepared.response();
+            coreClient.executeAccountOperation(new AccountBalanceOperationRequest(
+                    response.accountFrom(),
+                    response.accountTo(),
+                    response.amount(),
+                    response.amountTo(),
+                    response.currency(),
+                    response.targetCurrency()
+            ));
+            AccountTransfer transfer = repository.save(
+                    accountTransferMapper.toEntity(response, prepared.clientId())
+            );
+            AccountTransferResponse result = accountTransferMapper.toResponse(transfer);
+            log.info(
+                    "Перевод между счетами выполнен: transferId={}, clientId={}, accountFrom={}, accountTo={}, amount={}, amountTo={}, currency={}, targetCurrency={}",
+                    result.id(),
+                    prepared.clientId(),
+                    result.accountFrom(),
+                    result.accountTo(),
+                    result.amount(),
+                    result.amountTo(),
+                    result.currency(),
+                    result.targetCurrency()
+            );
+            return result;
+        } catch (RuntimeException exception) {
+            logAccountTransferFailure(request, exception);
+            throw exception;
+        }
     }
 
     private PreparedAccountTransfer prepare(AccountTransferRequest request) {
@@ -72,5 +92,26 @@ public class AccountTransferService {
     }
 
     private record PreparedAccountTransfer(UUID clientId, AccountTransferResponse response) {
+    }
+
+    private void logAccountTransferFailure(AccountTransferRequest request, RuntimeException exception) {
+        if (exception instanceof BusinessException businessException) {
+            log.warn(
+                    "Перевод между счетами не выполнен: accountFrom={}, accountTo={}, amount={}, code={}, status={}",
+                    request.accountFrom(),
+                    request.accountTo(),
+                    request.amount(),
+                    businessException.getErrorCode(),
+                    businessException.getStatus()
+            );
+            return;
+        }
+        log.error(
+                "Ошибка выполнения перевода между счетами: accountFrom={}, accountTo={}, amount={}",
+                request.accountFrom(),
+                request.accountTo(),
+                request.amount(),
+                exception
+        );
     }
 }

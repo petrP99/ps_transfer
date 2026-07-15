@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${TRANSFER_DB_URL:jdbc:postgresql://transfer-postgres:5432/ps_transfer}
+    username: ${TRANSFER_DB_USERNAME:postgres}
+    password: ${TRANSFER_DB_PASSWORD:postgres}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/psproject}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/psproject/protocol/openid-connect/certs}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:29092}
+
+services:
+  core:
+    url: ${CORE_SERVICE_URL:http://ps_core:8080}
+
+management:
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318/v1/traces}

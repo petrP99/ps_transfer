@@ -11,6 +11,7 @@ import com.pers.transfer.dto.response.TransferResponse;
 import com.pers.transfer.service.TransferService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
+@Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/transfers")
 public class TransferController {
@@ -43,11 +45,13 @@ public class TransferController {
 
     @PostMapping("/create")
     ResponseEntity<TransferResponse> create(@Valid @RequestBody TransferRequest request) {
+        log.info("Получен запрос на перевод по карте: amount={}", request.amount());
         return ResponseEntity.ok(transferService.create(request));
     }
 
     @PostMapping("/create-phone")
     ResponseEntity<TransferResponse> createPhone(@Valid @RequestBody PhoneTransferRequest request) {
+        log.info("Получен запрос на перевод по телефону: amount={}", request.amount());
         return ResponseEntity.ok(transferService.createPhone(request));
     }
 

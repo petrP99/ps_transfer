@@ -1,6 +1,8 @@
 package com.pers.transfer.exception;
 
 import feign.RetryableException;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
@@ -18,6 +20,7 @@ import java.util.List;
 public class ApiExceptionHandler {
 
     private final MessageSource messageSource;
+    private final Tracer tracer;
 
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<ProblemDetail> handleBusiness(BusinessException exception) {
@@ -29,6 +32,7 @@ public class ApiExceptionHandler {
         );
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(exception.getStatus(), detail);
         problem.setProperty("code", exception.getErrorCode().name());
+        addTraceId(problem);
         return ResponseEntity.status(exception.getStatus()).body(problem);
     }
 
@@ -42,8 +46,9 @@ public class ApiExceptionHandler {
                     LocaleContextHolder.getLocale()
             );
         }
-        return ResponseEntity.status(exception.getStatus())
-                .body(ProblemDetail.forStatusAndDetail(exception.getStatus(), detail));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(exception.getStatus(), detail);
+        addTraceId(problem);
+        return ResponseEntity.status(exception.getStatus()).body(problem);
     }
 
     @ExceptionHandler(RetryableException.class)
@@ -53,8 +58,9 @@ public class ApiExceptionHandler {
                 null,
                 LocaleContextHolder.getLocale()
         );
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, detail);
+        addTraceId(problem);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -74,6 +80,14 @@ public class ApiExceptionHandler {
                 : errors.get(0);
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
         problem.setProperty("errors", errors);
+        addTraceId(problem);
         return ResponseEntity.badRequest().body(problem);
+    }
+
+    private void addTraceId(ProblemDetail problem) {
+        Span span = tracer.currentSpan();
+        if (span != null) {
+            problem.setProperty("traceId", span.context().traceId());
+        }
     }
 }

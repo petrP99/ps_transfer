@@ -1,10 +1,13 @@
 package com.pers.transfer.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pers.transfer.config.OutboxTraceContext;
 import com.pers.transfer.domain.OutboxEvent;
 import com.pers.transfer.domain.OutboxStatus;
 import com.pers.transfer.event.BalanceOperationCommand;
 import com.pers.transfer.repository.OutboxEventRepository;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +30,8 @@ public class OutboxPublisher {
     private final OutboxEventRepository repository;
     private final ObjectMapper objectMapper;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final OutboxTraceContext outboxTraceContext;
+    private final Tracer tracer;
 
     @Value("${spring.kafka.topics.transfer-execute}")
     private String executionTopic;
@@ -67,14 +72,18 @@ public class OutboxPublisher {
     }
 
     private void publish(OutboxEvent event) {
+        Span span = outboxTraceContext.startSpan(event.getTraceParent(), "outbox publish " + executionTopic);
         try {
-            BalanceOperationCommand command =
-                    objectMapper.readValue(event.getPayload(), BalanceOperationCommand.class);
-            kafkaTemplate.send(executionTopic, event.getEventKey(), command).get(5, TimeUnit.SECONDS);
+            try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+                BalanceOperationCommand command =
+                        objectMapper.readValue(event.getPayload(), BalanceOperationCommand.class);
+                kafkaTemplate.send(executionTopic, event.getEventKey(), command).get(5, TimeUnit.SECONDS);
+            }
             event.setStatus(OutboxStatus.PUBLISHED);
             event.setPublishedAt(LocalDateTime.now());
             event.setLastError(null);
         } catch (Exception exception) {
+            span.error(exception);
             int attempts = event.getAttempts() + 1;
             event.setAttempts(attempts);
             event.setLastError(limit(exception.getMessage()));
@@ -89,6 +98,8 @@ public class OutboxPublisher {
             );
             event.setNextAttemptAt(LocalDateTime.now().plusSeconds(delay));
             log.warn("Outbox event {} publish attempt {} failed", event.getId(), attempts);
+        } finally {
+            span.end();
         }
     }
 

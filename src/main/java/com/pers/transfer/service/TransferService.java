@@ -17,12 +17,15 @@ import com.pers.transfer.dto.response.TransferPreviewResponse;
 import com.pers.transfer.dto.response.TransferResponse;
 import com.pers.transfer.event.BalanceOperationCommand;
 import com.pers.transfer.event.BalanceOperationResult;
+import com.pers.transfer.exception.BusinessException;
 import com.pers.transfer.exception.ErrorCode;
 import com.pers.transfer.exception.TransferException;
 import com.pers.transfer.mapper.TransferMapper;
 import com.pers.transfer.repository.AccountTransferRepository;
 import com.pers.transfer.repository.TransferRepository;
+import com.pers.transfer.websocket.TransferStatusWebSocketHandler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -39,6 +42,7 @@ import java.util.UUID;
 import static org.springframework.http.HttpStatus.CONFLICT;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class TransferService {
 
@@ -48,6 +52,7 @@ public class TransferService {
     private final OutboxService outboxService;
     private final TransferMapper transferMapper;
     private final TransferCalculationService calculationService;
+    private final TransferStatusWebSocketHandler transferStatusWebSocketHandler;
 
     public TransferPreviewResponse preview(TransferPreviewRequest request) {
         return prepare(request).preview();
@@ -59,22 +64,36 @@ public class TransferService {
 
     @Transactional
     public TransferResponse create(TransferRequest request) {
-        return create(prepare(new TransferPreviewRequest(
-                request.cardFrom(),
-                request.cardTo(),
-                request.amount(),
-                request.message()
-        )));
+        try {
+            TransferResponse response = create(prepare(new TransferPreviewRequest(
+                    request.cardFrom(),
+                    request.cardTo(),
+                    request.amount(),
+                    request.message()
+            )));
+            logTransferCreated("по карте", response);
+            return response;
+        } catch (RuntimeException exception) {
+            logTransferFailure("по карте", request.amount(), exception);
+            throw exception;
+        }
     }
 
     @Transactional
     public TransferResponse createPhone(PhoneTransferRequest request) {
-        return create(preparePhone(new PhoneTransferPreviewRequest(
-                request.cardFrom(),
-                request.phone(),
-                request.amount(),
-                request.message()
-        )));
+        try {
+            TransferResponse response = create(preparePhone(new PhoneTransferPreviewRequest(
+                    request.cardFrom(),
+                    request.phone(),
+                    request.amount(),
+                    request.message()
+            )));
+            logTransferCreated("по телефону", response);
+            return response;
+        } catch (RuntimeException exception) {
+            logTransferFailure("по телефону", request.amount(), exception);
+            throw exception;
+        }
     }
 
     private TransferResponse create(TransferPreparationResponse preparation) {
@@ -136,6 +155,27 @@ public class TransferService {
         }
         transfer.setStatus(result.successful() ? TransferStatus.SUCCESS : TransferStatus.FAILED);
         transfer.setFailureCode(result.failureCode());
+        TransferResponse response = transferMapper.toResponse(transfer);
+        transferStatusWebSocketHandler.sendStatus(response);
+        if (result.successful()) {
+            log.info(
+                    "Перевод исполнен: transferId={}, fromClientId={}, toClientId={}, amount={}, status={}",
+                    transfer.getId(),
+                    transfer.getFromClientId(),
+                    transfer.getToClientId(),
+                    transfer.getAmount(),
+                    transfer.getStatus()
+            );
+            return;
+        }
+        log.warn(
+                "Перевод не исполнен: transferId={}, fromClientId={}, toClientId={}, amount={}, code={}",
+                transfer.getId(),
+                transfer.getFromClientId(),
+                transfer.getToClientId(),
+                transfer.getAmount(),
+                result.failureCode()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -184,5 +224,34 @@ public class TransferService {
 
     private TransferException notFound(UUID id) {
         return new TransferException(HttpStatus.NOT_FOUND, ErrorCode.TRANSFER_NOT_FOUND, id);
+    }
+
+    private void logTransferCreated(String type, TransferResponse response) {
+        log.info(
+                "Перевод создан: type={}, transferId={}, fromClientId={}, toClientId={}, amount={}, amountTo={}, currency={}, targetCurrency={}, status={}",
+                type,
+                response.id(),
+                response.fromClientId(),
+                response.toClientId(),
+                response.amount(),
+                response.amountTo(),
+                response.currency(),
+                response.targetCurrency(),
+                response.status()
+        );
+    }
+
+    private void logTransferFailure(String type, BigDecimal amount, RuntimeException exception) {
+        if (exception instanceof BusinessException businessException) {
+            log.warn(
+                    "Перевод не создан: type={}, amount={}, code={}, status={}",
+                    type,
+                    amount,
+                    businessException.getErrorCode(),
+                    businessException.getStatus()
+            );
+            return;
+        }
+        log.error("Ошибка создания перевода: type={}, amount={}", type, amount, exception);
     }
 }

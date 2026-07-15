@@ -2,6 +2,7 @@ package com.pers.transfer.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pers.transfer.config.OutboxTraceContext;
 import com.pers.transfer.domain.OutboxEvent;
 import com.pers.transfer.domain.OutboxEventType;
 import com.pers.transfer.domain.OutboxStatus;
@@ -23,6 +24,7 @@ public class OutboxService {
 
     private final OutboxEventRepository repository;
     private final ObjectMapper objectMapper;
+    private final OutboxTraceContext outboxTraceContext;
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void saveExecutionRequested(BalanceOperationCommand command) {
@@ -32,6 +34,7 @@ public class OutboxService {
                 .eventType(OutboxEventType.TRANSFER_EXECUTION_REQUESTED)
                 .eventKey(command.operationId().toString())
                 .payload(write(command))
+                .traceParent(outboxTraceContext.captureTraceParent())
                 .status(OutboxStatus.PENDING)
                 .attempts(0)
                 .createdAt(now)

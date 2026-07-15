@@ -23,6 +23,8 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/psproject/protocol/openid-connect/certs}
   cloud:
     openfeign:
+      micrometer:
+        enabled: true
       client:
         config:
           core-service:
@@ -30,6 +32,10 @@ spring:
             read-timeout: 3000
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
     topics:
       transfer-execute: ps-transfer-execute
       transfer-result: ps-transfer-result
@@ -66,3 +72,26 @@ outbox:
     max-retry-delay-seconds: 3600
     retention-days: 7
     cleanup-cron: "0 0 3 * * *"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    prometheus:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

@@ -1,20 +1,70 @@
 services:
   transfer-postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: ps-transfer-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ps_transfer
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${TRANSFER_DB_PASSWORD:-postgres}
     ports:
       - "5434:5432"
     volumes:
-      - transfer-postgres-data:/var/lib/postgresql/data
+      - transfer_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ps_transfer"]
-      interval: 5s
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d ps_transfer" ]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
+    networks:
+      - observability-net
+
+  transfer-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    container_name: transfer-postgres-exporter
+    ports:
+      - "9188:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:${TRANSFER_DB_PASSWORD:-postgres}@transfer-postgres:5432/ps_transfer?sslmode=disable"
+    depends_on:
+      transfer-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:9187/metrics" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability-net
+
+  ps-transfer:
+    image: ps-transfer:latest
+    container_name: ps-transfer
+    build:
+      context: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TRANSFER_DB_URL: jdbc:postgresql://transfer-postgres:5432/ps_transfer
+      TRANSFER_DB_USERNAME: postgres
+      TRANSFER_DB_PASSWORD: ${TRANSFER_DB_PASSWORD:-postgres}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:8081/realms/psproject
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/psproject/protocol/openid-connect/certs
+      CORE_SERVICE_URL: http://ps_core:8080
+      CORE_INTERNAL_TOKEN: ${CORE_INTERNAL_TOKEN:-dev-transfer-internal-token}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318/v1/traces
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
+    depends_on:
+      transfer-postgres:
+        condition: service_healthy
+    networks:
+      - observability-net
 
 volumes:
-  transfer-postgres-data:
+  transfer_postgres_data:
+    name: ps_core_transfer_postgres_data
+
+networks:
+  observability-net:
+    external: true
+    name: ps-observability-net
