@@ -48,9 +48,9 @@ services:
       TRANSFER_DB_USERNAME: postgres
       TRANSFER_DB_PASSWORD: ${TRANSFER_DB_PASSWORD:-postgres}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KEYCLOAK_ISSUER_URI: ${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:8081/realms/psproject
+      KEYCLOAK_ISSUER_URI: ${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:?Set PUBLIC_HOST in .env}:8081/realms/psproject
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/psproject/protocol/openid-connect/certs
-      CORE_SERVICE_URL: http://ps_core:8080
+      CORE_SERVICE_URL: http://ps-core:8080
       CORE_INTERNAL_TOKEN: ${CORE_INTERNAL_TOKEN:-dev-transfer-internal-token}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318/v1/traces
       TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
