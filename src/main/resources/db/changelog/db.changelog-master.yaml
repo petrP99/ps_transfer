@@ -5,3 +5,5 @@ databaseChangeLog:
       file: db/changelog/add-outbox-trace-parent.sql
   - include:
       file: db/changelog/insert-data.sql
+  - include:
+      file: db/changelog/insert-data-clients-history.sql
